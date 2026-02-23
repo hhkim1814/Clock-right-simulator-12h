@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>12시간 시침-분침 직각 검증</title>
+
+<style>
+:root{
+  --bg:#0f172a;
+  --text:#e5e7eb;
+  --muted:#9ca3af;
+  --accent:#60a5fa;
+  --ok:#34d399;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;
+  background:radial-gradient(1200px 800px at 20% 10%, #1f2a44 0%, #0b1220 55%, #060a14 100%);
+  color:var(--text);
+  padding:20px;
+  display:flex;
+  justify-content:center;
+}
+.wrap{
+  width:min(1100px,100%);
+  display:grid;
+  gap:18px;
+  grid-template-columns:1.2fr .8fr;
+}
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr}
+}
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;
+  overflow:hidden;
+}
+.hd{
+  padding:14px 16px;
+  border-bottom:1px solid rgba(255,255,255,.12);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.title{font-weight:800}
+.badge{
+  font-size:12px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:rgba(96,165,250,.15);
+  border:1px solid rgba(96,165,250,.4);
+}
+.body{padding:16px}
+
+/* Clock */
+.stage{display:flex;justify-content:center;align-items:center;padding:20px 0}
+.clock{
+  width:min(420px,80vw);
+  aspect-ratio:1/1;
+  border-radius:50%;
+  position:relative;
+  background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.12), transparent 55%),
+             linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 0 0 10px rgba(0,0,0,.2), 0 18px 40px rgba(0,0,0,.35);
+  overflow:hidden;
+}
+.hand{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform-origin:50% 90%;
+  transform:translate(-50%,-90%) rotate(0deg);
+  border-radius:999px;
+  will-change:transform;
+}
+.hour{width:8px;height:140px;background:linear-gradient(#34d399,#065f46)}
+.minute{width:5px;height:190px;background:linear-gradient(#f87171,#7f1d1d)}
+.center{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:14px;
+  height:14px;
+  background:#fff;
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  box-shadow:0 0 12px rgba(255,255,255,.45);
+}
+
+/* Arc overlay */
+.arc{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  display:none;
+}
+.arc svg{width:100%;height:100%}
+.arc text{fill:#fff;font-weight:800;font-size:14px;text-anchor:middle}
+
+/* Face ticks & numbers */
+.tick{
+  position:absolute;
+  left:50%;
+  bottom:50%;
+  transform-origin:50% 100%;
+  pointer-events:none;
+}
+.tick.small{
+  width:2px;
+  height:10px;
+  background:rgba(255,255,255,.35);
+}
+.tick.large{
+  width:3px;
+  height:18px;
+  background:rgba(255,255,255,.82);
+}
+.num{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  font-weight:800;
+  color:rgba(255,255,255,.92);
+  user-select:none;
+  text-shadow:0 2px 6px rgba(0,0,0,.4);
+}
+
+/* Right panel */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kpi{
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  padding:12px;
+}
+.label{font-size:12px;color:var(--muted)}
+.value{font-weight:900;font-size:22px;margin-top:4px}
+
+.controls{margin-top:14px;display:grid;gap:10px}
+input[type=range]{width:100%}
+button{
+  padding:8px 12px;
+  border-radius:10px;
+  font-weight:700;
+  cursor:pointer;
+  background:rgba(96,165,250,.15);
+  border:1px solid rgba(96,165,250,.4);
+  color:var(--text);
+}
+.log{
+  margin-top:14px;
+  max-height:220px;
+  overflow:auto;
+  font-size:13px;
+  background:rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  padding:10px
+}
+.log div{padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.15)}
+.log div:last-child{border:none}
+.complete{
+  margin-top:14px;
+  padding:12px;
+  border-radius:12px;
+  background:rgba(52,211,153,.15);
+  border:1px solid rgba(52,211,153,.5);
+  font-weight:800;
+  text-align:center;
+  display:none;
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <!-- LEFT -->
+  <section class="card">
+    <div class="hd">
+      <div class="title">⏱ 12시간 시침-분침 직각 검증</div>
+      <div class="badge" id="timeLabel">00:00:00</div>
+    </div>
+
+    <div class="body">
+      <div class="stage">
+        <div class="clock" id="clock">
+
+          <div class="arc" id="arcLayer">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <path id="arcPath" fill="rgba(96,165,250,.35)" stroke="rgba(96,165,250,.9)" stroke-width="1.5"></path>
+              <text id="arcText" x="50" y="52">90°</text>
+            </svg>
+          </div>
+
+          <div class="hand hour" id="hourHand"></div>
+          <div class="hand minute" id="minuteHand"></div>
+          <div class="center"></div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--muted);font-size:13px">
+        시침-분침 각도 차이: <b id="angleDiff">0.00°</b>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT -->
+  <section class="card">
+    <div class="hd">
+      <div class="title">📊 검증 결과</div>
+      <div class="badge">00:00:00 → 12:00:00</div>
+    </div>
+
+    <div class="body">
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">총 직각 횟수</div>
+          <div class="value">22</div>
+        </div>
+        <div class="kpi">
+          <div class="label">현재 발생 횟수</div>
+          <div class="value" id="currentCount">0</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label>속도 (배속)
+          <input type="range" id="speed" min="240" max="1200" value="600" step="10">
+        </label>
+        <button id="toggle">▶ 시작</button>
+      </div>
+
+      <div class="log" id="eventLog"></div>
+      <div class="complete" id="completeMsg">✔ 12시간 동안 직각은 총 22회 발생합니다.</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* =========================
+   Core state
+========================= */
+const SIM_SECONDS = 43200; // 12h
+let t = 0;
+let running = false;
+let lastTs = null;
+
+let eventIndex = 0;
+let simulationEnded = false;
+let completionAnnounced = false;
+
+let pauseUntil = 0; // for 1s pause on right angle
+
+// Text update throttle (10fps)
+const TEXT_INTERVAL_MS = 100;
+let lastTextUpdate = 0;
+
+const clock = document.getElementById("clock");
+const hourHand = document.getElementById("hourHand");
+const minuteHand = document.getElementById("minuteHand");
+const timeLabel = document.getElementById("timeLabel");
+const angleDiff = document.getElementById("angleDiff");
+
+const currentCount = document.getElementById("currentCount");
+const logEl = document.getElementById("eventLog");
+const completeMsg = document.getElementById("completeMsg");
+
+const speedInput = document.getElementById("speed");
+const toggleBtn = document.getElementById("toggle");
+
+const arcLayer = document.getElementById("arcLayer");
+const arcPath = document.getElementById("arcPath");
+const arcText = document.getElementById("arcText");
+
+/* =========================
+   Right-angle event times (math)
+   relative angle = (11/120)t (deg)
+   (11/120)t = 90 + 180k
+========================= */
+function computeEvents(){
+  const arr = [];
+  const factor = 120 / 11;
+  for (let k = 0;; k++){
+    const time = factor * (90 + 180*k);
+    if (time > SIM_SECONDS) break;
+    arr.push(time);
+  }
+  return arr;
+}
+const events = computeEvents();
+
+/* =========================
+   Face build: ticks + numbers (pixel-accurate, responsive)
+========================= */
+function buildClockFace(){
+  // remove previous
+  clock.querySelectorAll('.tick,.num').forEach(el => el.remove());
+
+  const size = clock.clientWidth;      // square
+  const radius = size / 2;
+  const inset = Math.max(12, Math.round(size * 0.035)); // keep a little margin from rim
+  const tickR = radius - inset;
+
+  // 60 ticks
+  for (let i=0; i<60; i++){
+    const tick = document.createElement("div");
+    tick.className = "tick " + (i % 5 === 0 ? "large" : "small");
+    tick.style.transform =
+      `translateX(-50%) rotate(${i*6}deg) translateY(-${tickR}px)`;
+    clock.appendChild(tick);
+  }
+
+  // 1~12 numbers
+  const numR = radius * 0.72;
+  for (let n=1; n<=12; n++){
+    const num = document.createElement("div");
+    num.className = "num";
+    num.textContent = n;
+
+    const theta = (n*30 - 90) * Math.PI / 180;
+    const x = radius + numR * Math.cos(theta);
+    const y = radius + numR * Math.sin(theta);
+
+    num.style.left = `${x}px`;
+    num.style.top = `${y}px`;
+    num.style.fontSize = (n % 3 === 0 ? "20px" : "18px");
+
+    clock.appendChild(num);
+  }
+}
+
+// initial build
+buildClockFace();
+
+// rebuild on resize (debounced)
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(buildClockFace, 80);
+});
+
+/* =========================
+   Utilities
+========================= */
+function formatTime(sec){
+  const s = Math.max(0, Math.min(SIM_SECONDS, sec));
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const ss = Math.floor(s%60);
+  const pad = n => String(n).padStart(2,"0");
+  return `${pad(h)}:${pad(m)}:${pad(ss)}`;
+}
+
+function getAngles(sec){
+  const minDeg = (sec/60)*6;      // 0.1 deg/sec
+  const hourDeg = (sec/3600)*30;  // 1/120 deg/sec * 360 = 3? (same as 30 deg/hr)
+  return { minDeg, hourDeg };
+}
+
+/* =========================
+   Arc drawing (always "small angle" wedge)
+========================= */
+function drawArcSmall(minDeg, hourDeg){
+  // Always show the small angle wedge (<= 180°),
+  // so 270° cases are visualized as the complementary 90°.
+  const r = 40;
+  const center = {x:50, y:50};
+
+  const rel = (minDeg - hourDeg + 360) % 360;
+  const small = rel > 180 ? 360 - rel : rel;
+
+  // Choose start/end so the drawn arc is always the small arc (sweep=1, largeArc=0)
+  let startDeg, endDeg;
+  if (rel <= 180){
+    startDeg = hourDeg;
+    endDeg = hourDeg + small;
+  } else {
+    startDeg = minDeg;
+    endDeg = minDeg + small;
+  }
+
+  const toXY = (deg)=>{
+    const rad = (deg - 90) * Math.PI / 180;
+    return { x: center.x + r*Math.cos(rad), y: center.y + r*Math.sin(rad) };
+  };
+
+  const p1 = toXY(startDeg);
+  const p2 = toXY(endDeg);
+
+  arcPath.setAttribute(
+    "d",
+    `M 50 50
+     L ${p1.x} ${p1.y}
+     A ${r} ${r} 0 0 1 ${p2.x} ${p2.y}
+     Z`
+  );
+  arcText.textContent = `${Math.round(small)}°`; // should be 90° here
+  arcLayer.style.display = "block";
+}
+
+function hideArc(){ arcLayer.style.display = "none"; }
+
+/* =========================
+   Render
+========================= */
+function updateHands(){
+  const { minDeg, hourDeg } = getAngles(t);
+  minuteHand.style.transform = `translate(-50%,-90%) rotate(${minDeg}deg)`;
+  hourHand.style.transform   = `translate(-50%,-90%) rotate(${hourDeg}deg)`;
+  return { minDeg, hourDeg };
+}
+
+function updateText(minDeg, hourDeg){
+  const diff = Math.abs(minDeg - hourDeg) % 360;
+  const small = diff > 180 ? 360 - diff : diff;
+  angleDiff.textContent = small.toFixed(2) + "°";
+  timeLabel.textContent = formatTime(t);
+}
+
+/* =========================
+   Loop
+========================= */
+function loop(ts){
+  if(!lastTs) lastTs = ts;
+  const dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+
+  const now = performance.now();
+
+  if (running && now > pauseUntil){
+    t += dt * Number(speedInput.value);
+
+    // update visuals
+    const { minDeg, hourDeg } = updateHands();
+
+    if (ts - lastTextUpdate > TEXT_INTERVAL_MS){
+      lastTextUpdate = ts;
+      updateText(minDeg, hourDeg);
+    }
+
+    // events logging + arc + 1s pause
+    while (eventIndex < events.length && t >= events[eventIndex]){
+      // ★ 정확한 직각 시점으로 보정
+      t = events[eventIndex];
+
+      const { minDeg, hourDeg } = updateHands();
+      updateText(minDeg, hourDeg);
+
+      const frag = document.createDocumentFragment();
+      const div = document.createElement("div");
+      div.textContent =
+        `${eventIndex+1}. ${formatTime(events[eventIndex])} → 직각 발생`;
+      frag.appendChild(div);
+      logEl.appendChild(frag);
+      logEl.scrollTop = logEl.scrollHeight;
+
+      eventIndex++;
+      currentCount.textContent = String(eventIndex);
+
+      drawArcSmall(minDeg, hourDeg);
+
+      pauseUntil = performance.now() + 1000;
+      setTimeout(hideArc, 1000);
+    }
+
+    // completion message after 22nd event (do NOT stop here)
+    if (eventIndex === events.length && !completionAnnounced){
+      completeMsg.style.display = "block";
+      completionAnnounced = true;
+    }
+
+    // end at 12:00
+    if (t >= SIM_SECONDS){
+      t = SIM_SECONDS;
+      const angles = updateHands();
+      updateText(angles.minDeg, angles.hourDeg);
+
+      running = false;
+      simulationEnded = true;
+      toggleBtn.textContent = "🔄 다시 시작";
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* =========================
+   Controls
+========================= */
+function resetAllAndStart(){
+  t = 0;
+  running = true;
+  lastTs = null;
+  lastTextUpdate = 0;
+
+  eventIndex = 0;
+  simulationEnded = false;
+  completionAnnounced = false;
+
+  pauseUntil = 0;
+  hideArc();
+
+  completeMsg.style.display = "none";
+  logEl.innerHTML = "";
+  currentCount.textContent = "0";
+
+  toggleBtn.textContent = "⏸ 정지";
+
+  const angles = updateHands();
+  updateText(angles.minDeg, angles.hourDeg);
+}
+
+toggleBtn.onclick = () => {
+  if (simulationEnded){
+    resetAllAndStart();
+    return;
+  }
+
+  running = !running;
+  toggleBtn.textContent = running ? "⏸ 정지" : "▶ 시작";
+  lastTs = null;
+};
+
+// initial render
+{
+  const angles = updateHands();
+  updateText(angles.minDeg, angles.hourDeg);
+}
+</script>
+</body>
+</html>
